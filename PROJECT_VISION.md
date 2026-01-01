@@ -227,27 +227,193 @@ Build a **fully automated momentum trading system** that generates sustainable s
 
 ## Technical Architecture Vision
 
+### Architecture Philosophy
+
+**Dual-Language Approach** - Leverage the strengths of each platform:
+
+| Aspect | C# .NET (Primary) | Python (Secondary) |
+|--------|-------------------|-------------------|
+| **Role** | Core application, business logic, UI | Data tooling, market APIs |
+| **Strengths Used** | Type safety, performance, Blazor UI, async patterns | Data libraries (pandas), market APIs (yfinance, tradingview-screener) |
+| **Examples** | Trading engine, risk manager, dashboard | Market data fetching, analysis scripts, screener integration |
+
+**Inspiration:** Architecture pattern from `urus-blazor` project - Clean Architecture with auxiliary Python tooling.
+
+### Technology Stack
+
+| Layer | Technology | Rationale |
+|-------|------------|-----------|
+| **UI** | Blazor Server + MudBlazor | Real-time updates, rich components, C# full-stack |
+| **Backend** | ASP.NET Core | Robust, performant, excellent async support |
+| **Database** | SQLite | Simple, file-based, sufficient for single-user trading system |
+| **ORM** | EF Core | Standard .NET data access |
+| **Testing** | xUnit + FluentAssertions | .NET standard, expressive assertions |
+| **Python Tooling** | pip-tools | Reproducible Python dependencies |
+
 ### Current State
 ```
 TradingView Screener → Python Tracker → Telegram Alerts → Manual Review
+                              ↓
+                    (All logic in Python)
 ```
 
 ### Target State
 ```
-Multi-Market Data → Momentum Engine → Risk Manager → Order Executor → Moomoo API
-                         ↓                              ↓
-                   Signal Validator              Position Manager
-                         ↓                              ↓
-                  Telegram Reports ←──────────── Performance Tracker
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        C# .NET (Primary)                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│   ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    │
+│   │  Blazor Web UI  │    │  Trading Engine │    │   Risk Manager  │    │
+│   │   (Dashboard)   │◄──►│  (Core Logic)   │◄──►│ (Position Size) │    │
+│   └─────────────────┘    └─────────────────┘    └─────────────────┘    │
+│            │                      │                      │              │
+│            ▼                      ▼                      ▼              │
+│   ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    │
+│   │    SQLite DB    │    │  Telegram Bot   │    │   Moomoo API    │    │
+│   │  (Persistence)  │    │    (Alerts)     │    │  (Execution)    │    │
+│   └─────────────────┘    └─────────────────┘    └─────────────────┘    │
+│                                  ▲                                      │
+└──────────────────────────────────┼──────────────────────────────────────┘
+                                   │
+                    ┌──────────────┴──────────────┐
+                    │     Python (Secondary)       │
+                    ├──────────────────────────────┤
+                    │  ┌────────────────────────┐  │
+                    │  │  TradingView Screener  │  │
+                    │  │  (Data Acquisition)    │  │
+                    │  └────────────────────────┘  │
+                    │  ┌────────────────────────┐  │
+                    │  │  Market Data (yfinance)│  │
+                    │  │  (Price/Volume Data)   │  │
+                    │  └────────────────────────┘  │
+                    │  ┌────────────────────────┐  │
+                    │  │   Analysis Scripts     │  │
+                    │  │  (pandas, numpy)       │  │
+                    │  └────────────────────────┘  │
+                    └──────────────────────────────┘
 ```
 
-### Key Components to Build
-1. **Moomoo API Integration** - Order execution layer
-2. **Risk Manager** - Position sizing, stop-loss management, exposure limits
-3. **Signal Validator** - Confirm signals before execution
-4. **Position Manager** - Track open positions, manage exits
-5. **Performance Tracker** - P&L tracking, win rate, drawdown monitoring
-6. **SGX Momentum Module** - Parallel system for Singapore market
+### Target Project Structure
+
+```
+momentum-screener/
+├── src/
+│   ├── MomentumScreener.Core/           # Domain entities, interfaces
+│   │   ├── Entities/
+│   │   │   ├── Alert.cs
+│   │   │   ├── Position.cs
+│   │   │   ├── Trade.cs
+│   │   │   └── RiskProfile.cs
+│   │   ├── Enums/
+│   │   │   ├── AlertType.cs
+│   │   │   └── TradeStatus.cs
+│   │   └── Interfaces/
+│   │       ├── IAlertService.cs
+│   │       ├── ITradingEngine.cs
+│   │       └── IRiskManager.cs
+│   │
+│   ├── MomentumScreener.Infrastructure/  # External integrations
+│   │   ├── Data/
+│   │   │   ├── AppDbContext.cs
+│   │   │   └── Migrations/
+│   │   ├── Services/
+│   │   │   ├── TelegramService.cs
+│   │   │   ├── MoomooService.cs
+│   │   │   └── MarketDataService.cs
+│   │   └── Python/
+│   │       └── PythonBridge.cs           # Interop with Python tools
+│   │
+│   └── MomentumScreener.Web/             # Blazor Server UI
+│       ├── Components/
+│       │   ├── Layout/
+│       │   └── Pages/
+│       │       ├── Dashboard.razor
+│       │       ├── Alerts.razor
+│       │       ├── Positions.razor
+│       │       └── Settings.razor
+│       └── Program.cs
+│
+├── tests/
+│   ├── MomentumScreener.Core.Tests/
+│   └── MomentumScreener.Integration.Tests/
+│
+├── tools/
+│   └── py/
+│       ├── screener/                     # TradingView integration
+│       │   └── volume_momentum_tracker.py
+│       ├── data/                         # Market data fetching
+│       │   └── market_data.py
+│       └── analysis/                     # Analysis scripts
+│           └── performance_analyzer.py
+│
+├── docs/
+│   ├── TECHNICAL_GUIDE.md
+│   ├── PAPER_TRADING.md
+│   └── RISK_MANAGEMENT.md
+│
+├── data/                                 # SQLite database location
+│   └── momentum.db
+│
+├── .editorconfig                         # Code style enforcement
+├── Directory.Build.props                 # Shared build settings
+├── momentum-screener.sln
+├── requirements.in                       # Python dependencies (source)
+├── requirements.txt                      # Python dependencies (locked)
+├── PROJECT_VISION.md
+├── CLAUDE.md
+└── README.md
+```
+
+### C# Components to Build
+
+| Component | Project | Purpose |
+|-----------|---------|---------|
+| **Alert Entity** | Core | Domain model for momentum alerts |
+| **Position Entity** | Core | Track open/closed positions |
+| **Trade Entity** | Core | Individual trade records |
+| **RiskProfile** | Core | Risk parameters per phase |
+| **ITradingEngine** | Core | Interface for trading logic |
+| **IRiskManager** | Core | Interface for risk calculations |
+| **AppDbContext** | Infrastructure | EF Core SQLite context |
+| **TelegramService** | Infrastructure | Send alerts via Telegram |
+| **MoomooService** | Infrastructure | Moomoo OpenAPI integration |
+| **PythonBridge** | Infrastructure | Execute Python scripts, parse output |
+| **Dashboard** | Web | Real-time overview |
+| **Alerts Page** | Web | Alert history and management |
+| **Positions Page** | Web | Current and historical positions |
+| **Settings Page** | Web | Configuration management |
+
+### Python Components to Retain/Refactor
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| **Screener** | tools/py/screener/ | TradingView data acquisition |
+| **Market Data** | tools/py/data/ | yfinance integration |
+| **Analyzers** | tools/py/analysis/ | Performance analysis scripts |
+
+### C# ↔ Python Integration
+
+Communication via JSON over stdout:
+
+```csharp
+// PythonBridge.cs
+public async Task<List<Alert>> FetchAlertsAsync()
+{
+    ProcessStartInfo psi = new()
+    {
+        FileName = "python",
+        Arguments = "tools/py/screener/fetch_alerts.py --json",
+        RedirectStandardOutput = true
+    };
+
+    using Process process = Process.Start(psi);
+    string json = await process.StandardOutput.ReadToEndAsync();
+    return JsonSerializer.Deserialize<List<Alert>>(json);
+}
+```
+
+Python scripts output JSON, C# parses and processes.
 
 ---
 
@@ -298,6 +464,7 @@ Multi-Market Data → Momentum Engine → Risk Manager → Order Executor → Mo
 3. **Backup & Recovery** - What happens if primary system fails during market hours?
 4. **Tax Optimization** - Structure for SG-based trading of US/SG markets?
 5. **Scaling Strategy** - At what capital level to increase position sizes?
+6. **Migration Strategy** - Incremental migration from Python-only to C#/.NET primary, or big-bang rewrite?
 
 ---
 
@@ -306,6 +473,7 @@ Multi-Market Data → Momentum Engine → Risk Manager → Order Executor → Mo
 | Date | Changes |
 |------|---------|
 | 2026-01-01 | Initial vision document created |
+| 2026-01-01 | Added technical architecture: C# .NET primary + Python secondary, Blazor UI, SQLite database |
 
 ---
 
