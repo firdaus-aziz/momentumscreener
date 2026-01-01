@@ -1,117 +1,246 @@
-# Claude Code Project Context
+# Momentum Screener - Claude Code Context
 
 ## Project Summary
 
-Momentum trading alert system for US small-cap stocks. Currently in Phase 1 (Alert System), evolving toward fully automated trading.
+Momentum trading system for US small-cap stocks.
 
-**Trading philosophy:** LONG TRADES ONLY - bullish momentum plays
+**Architecture:** C# .NET 8 (primary) + Python (secondary)
+**UI:** Blazor Server + MudBlazor
+**Database:** SQLite + EF Core
+**Status:** Implementation in progress
+
+---
+
+## Quick Reference
+
+### Solution Structure
+
+```
+momentum-screener/
+├── src/
+│   ├── MomentumScreener.Core/           # Domain (entities, interfaces)
+│   ├── MomentumScreener.Infrastructure/ # Data, services, integrations
+│   └── MomentumScreener.Web/            # Blazor Server UI
+├── tests/
+│   ├── MomentumScreener.Core.Tests/
+│   └── MomentumScreener.Integration.Tests/
+├── tools/py/                            # Python data tools
+└── data/                                # SQLite database
+```
+
+### Key Commands
+
+```bash
+# Build
+dotnet build
+
+# Run web app
+dotnet run --project src/MomentumScreener.Web
+
+# Run with hot reload
+dotnet watch --project src/MomentumScreener.Web
+
+# Run tests
+dotnet test
+
+# EF migrations
+dotnet ef migrations add Name --project src/MomentumScreener.Infrastructure --startup-project src/MomentumScreener.Web
+dotnet ef database update --project src/MomentumScreener.Infrastructure --startup-project src/MomentumScreener.Web
+
+# Python setup
+source .venv/bin/activate
+pip-sync requirements.txt
+```
+
+---
+
+## Implementation Progress
+
+**Always check `IMPLEMENTATION_PLAN.md` first** for current phase, checklist status, and session continuity notes.
+
+| Phase | Focus |
+|-------|-------|
+| 1 | Infrastructure (solution, projects, build) |
+| 2 | Core Domain (entities, enums, interfaces) |
+| 3 | Data Layer (SQLite, EF Core, repos) |
+| 4 | Python Bridge (C# ↔ Python integration) |
+| 5 | Services (trading engine, risk, telegram) |
+| 6 | Blazor UI (dashboard, pages) |
+| 7 | Integration (wire together) |
+| 8 | Testing (unit, integration) |
+| 9 | Migration (cleanup, archive) |
+
+---
+
+## Domain Model
+
+### Core Entities
+
+| Entity | Purpose |
+|--------|---------|
+| `Alert` | Momentum alert from screener |
+| `Position` | Open or closed trading position |
+| `Trade` | Completed trade record |
+| `RiskProfile` | Risk parameters per phase |
+| `MarketCondition` | Market sentiment score |
+
+### Alert Types
+
+```csharp
+enum AlertType
+{
+    FlatToSpike,      // Consolidation → breakout (highest success)
+    PriceSpike,       // Intraday price surge
+    VolumeClimber,    // Rising in volume rankings
+    VolumeNewcomer,   // New high-volume entry
+    PremarketPrice,   // Premarket price movement
+    PremarketVolume   // Premarket volume surge
+}
+```
+
+### Automation Phases
+
+```csharp
+enum AutomationPhase
+{
+    PaperTrading,      // Validation, no real money
+    ManualExecute,     // Alerts → manual trades
+    OneClick,          // Pre-configured orders
+    AutoWithApproval,  // Auto-queue, approve/reject
+    FullAuto           // Autonomous execution
+}
+```
+
+---
+
+## Coding Guidelines
+
+### C# Conventions (from urus-blazor)
+
+```csharp
+// Use explicit types with target-typed new()
+List<Alert> alerts = new();
+
+// Nullable reference types
+string? description = null;
+
+// Null checks
+if (entity is null) throw new ArgumentNullException(nameof(entity));
+
+// Guard clauses
+ArgumentNullException.ThrowIfNull(parameter);
+ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+// Money is always decimal
+decimal price = 10.50m;
+```
+
+### Project Dependencies
+
+```
+Web → Infrastructure → Core
+Tests → Core, Infrastructure
+```
+
+Core has no external dependencies (pure domain).
+
+---
+
+## Python Integration
+
+Python is used for data acquisition only:
+
+```
+tools/py/
+├── screener/    # TradingView integration
+├── data/        # yfinance market data
+└── analysis/    # Performance analysis
+```
+
+### C# ↔ Python Communication
+
+Python scripts output JSON to stdout. C# parses with `System.Text.Json`.
+
+```csharp
+// PythonBridge example
+ProcessStartInfo psi = new()
+{
+    FileName = "python",
+    Arguments = "tools/py/screener/fetch_alerts.py --json",
+    RedirectStandardOutput = true
+};
+```
+
+---
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `volume_momentum_tracker.py` | Core alert system - scans, detects patterns, sends Telegram alerts |
-| `paper_trading_system.py` | Simulates trades based on alerts using EMA entry/exit |
-| `market_sentiment_scorer.py` | Scores market conditions (0-100) for position sizing |
-| `end_of_day_analyzer.py` | Post-market analysis of alert success rates |
-| `tradingview_screener_bot.py` | TradingView data collection |
+| `PROJECT_VISION.md` | Long-term roadmap, architecture decisions |
+| `IMPLEMENTATION_PLAN.md` | Phased plan with checklists |
+| `momentum-screener.sln` | Solution file |
+| `data/momentum.db` | SQLite database |
+| `.editorconfig` | Code style rules |
+| `Directory.Build.props` | Shared build settings |
 
-## Architecture
+---
 
-```
-TradingView API (via cookies)
-    → volume_momentum_tracker.py (detection)
-    → Telegram alerts
-    → paper_trading_system.py (validation)
-    → end_of_day_analyzer.py (performance tracking)
-```
+## Trading Context
 
-## Alert Types
+### Philosophy
+- **LONG TRADES ONLY** - bullish momentum
+- Small-cap US stocks (price < $20, no OTC)
 
-1. **flat_to_spike** - Consolidation → breakout (highest success rate)
-2. **price_spike** - Intraday price surge
-3. **volume_climber** - Rising volume rankings
-4. **volume_newcomer** - New high-volume entry
-5. **premarket alerts** - Pre-market movements
+### Risk Limits by Phase
 
-## Current Development Phase
+| Phase | Max Risk/Trade | Max Daily Loss |
+|-------|---------------|----------------|
+| Paper | N/A | N/A |
+| Manual | 5% | 10% |
+| OneClick | 2% | 6% |
+| Auto+Approval | 2% | 5% |
+| FullAuto | 1-2% | 4% |
 
-**Phase 1: Alert System** (current)
-- Paper trading validation in progress
-- Target: 1 month paper trading before live
+### Capital
+- Starting: ~$1,100 USD (Feb 2026)
+- Target: $5,000 for sustainable operation
 
-**Next:** Phase 2 (Manual Execute) - Feb 2026 with $1,100 capital
-
-See `PROJECT_VISION.md` for full roadmap.
-
-## Key Technical Patterns
-
-### Flat-to-Spike Detection
-```python
-# Thresholds
-flat_volatility_threshold = 3.0%    # Max volatility for "flat"
-min_flat_duration = 8 minutes
-flat_period_window = 30 minutes
-```
-
-### Momentum Scoring
-```python
-score = (price_change * 0.4) + (rel_volume * 0.3) + (change_from_open * 0.3)
-# Priority: >50 high, 20-50 medium, <20 low
-```
-
-### Market Sentiment (strongest predictor)
-- IWM vs SPY outperformance: 0.988 correlation with alert success
-- Score 80-100: Excellent, 65-79: Good, 45-64: Fair, 0-44: Poor
-
-## Important Constraints
-
-1. **Risk management approach:** User has no prior knowledge - use established frameworks (Kelly criterion, fixed fractional)
-2. **Capital:** Starting with ~$1,100 USD in Feb 2026
-3. **PDT rule:** Under $25k means max 3 day trades per 5 days
-4. **Markets:** US small-caps primary, SGX secondary consideration (timezone alignment)
-5. **Excluded:** Cryptocurrency
-
-## Common Commands
-
-```bash
-# Single scan
-python volume_momentum_tracker.py --single
-
-# Continuous with Telegram
-python volume_momentum_tracker.py --continuous \
-  --bot-token "TOKEN" --chat-id "CHAT_ID"
-
-# With paper trading
-python volume_momentum_tracker.py --continuous --paper-trading
-
-# Paper trading report
-python volume_momentum_tracker.py --paper-report
-
-# End of day analysis
-python end_of_day_analyzer.py --date 2025-11-06
-```
-
-## Data Locations
-
-- `momentum_data/` - Alert JSON files
-- `momentum_data/paper_trades/` - Paper trading history
-- `volume_momentum_tracker.log` - System logs
-- `telegram_alerts_sent.jsonl` - Sent alert log
-
-## Current Blockers
-
-See `SETUP_STATUS.md` for:
-- rookiepy Python 3.14 compatibility issue
-- Moomoo API integration pending
+---
 
 ## When Making Changes
 
-1. **Alert logic changes:** Test with `--single` first
-2. **Threshold changes:** Document reasoning in commit
-3. **New features:** Align with automation phase goals in `PROJECT_VISION.md`
-4. **Risk management:** Prefer established frameworks over custom solutions
+1. **Check IMPLEMENTATION_PLAN.md** for current phase
+2. **Follow phase checklist** - don't skip ahead
+3. **Update lessons learned** after completing tasks
+4. **Run tests** before committing: `dotnet test`
+5. **Follow coding guidelines** - EditorConfig enforced
 
-## Historical Context
+### Before Writing Code
 
-Archived documentation in `docs/archive/` contains detailed implementation notes from development (bug fixes, feature enhancements, analysis reports).
+1. Check if entity/interface exists in Core
+2. Follow existing patterns in the codebase
+3. Use MudBlazor components for UI
+4. Prefer established frameworks for new features
+
+---
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Build fails | `dotnet restore`, check SDK version |
+| EF migration fails | Ensure startup project is Web |
+| Python bridge fails | Check `.venv` activation, Python path |
+| Blazor not updating | Use `dotnet watch`, not `dotnet run` |
+| SQLite locked | Close other connections |
+
+---
+
+## Session Start Checklist
+
+1. Read `IMPLEMENTATION_PLAN.md` Session Continuity section
+2. Check current phase status
+3. Review any blockers noted
+4. Continue from last session's "Next Steps"
+5. Update status after work is done

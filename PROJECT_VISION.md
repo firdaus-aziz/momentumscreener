@@ -464,7 +464,12 @@ Python scripts output JSON, C# parses and processes.
 3. **Backup & Recovery** - What happens if primary system fails during market hours?
 4. **Tax Optimization** - Structure for SG-based trading of US/SG markets?
 5. **Scaling Strategy** - At what capital level to increase position sizes?
-6. **Migration Strategy** - Incremental migration from Python-only to C#/.NET primary, or big-bang rewrite?
+
+### Resolved Questions
+
+| Question | Decision | Date |
+|----------|----------|------|
+| Migration Strategy | Big-bang rewrite with phased execution. See `IMPLEMENTATION_PLAN.md` | 2026-01-01 |
 
 ---
 
@@ -474,6 +479,7 @@ Python scripts output JSON, C# parses and processes.
 |------|---------|
 | 2026-01-01 | Initial vision document created |
 | 2026-01-01 | Added technical architecture: C# .NET primary + Python secondary, Blazor UI, SQLite database |
+| 2026-01-01 | Migration strategy decided: Big-bang rewrite with phased execution |
 
 ---
 
